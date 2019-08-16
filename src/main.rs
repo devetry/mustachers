@@ -11,15 +11,14 @@ use actix_web::{error, middleware, web, App, Error, HttpResponse, HttpServer};
 use futures::future::{err, Either};
 use futures::{Future, Stream};
 
-
 use std::time::{Duration, Instant};
 
-use image::{DynamicImage, GrayImage, Rgba, FilterType};
+use image::{DynamicImage, GrayImage, FilterType};
 use image::imageops::overlay;
-use imageproc::drawing::{draw_hollow_rect_mut};
-use imageproc::rect::Rect;
 
 use rustface::{Detector, FaceInfo, ImageData};
+
+use rand::Rng;
 
 const OUTPUT_FILE: &str = "test.png";
 
@@ -79,6 +78,11 @@ fn detect_faces(detector: &mut dyn Detector, gray: &GrayImage) -> Vec<FaceInfo> 
     faces
 }
 
+pub fn choose_mustache() -> String {
+    let mut rng = rand::thread_rng();
+    let index = rng.gen::<u32>() % 4;
+    format!("mustaches/{}.png", index)
+}
 
 pub fn upload(
     multipart: Multipart,
@@ -87,15 +91,16 @@ pub fn upload(
     counter.set(counter.get() + 1);
     println!("{:?}", counter.get());
 
-
-
     multipart
         .map_err(error::ErrorInternalServerError)
         .map(|field| save_file(field).into_stream())
         .flatten()
         .collect()
         .map(|_sizes| {
-            let mustache = match image::open("mustache_1.png") {
+
+            let mustache_file = choose_mustache();
+            println!("What is a mustach? {}", mustache_file);
+            let mustache = match image::open(mustache_file) {
                 Ok(image) => image,
                 Err(message) => {
                     println!("Fialed to read image: {}", message);
@@ -130,8 +135,8 @@ pub fn upload(
 
             for face in faces {
                 let bbox = face.bbox();
-                let rect = Rect::at(bbox.x(), bbox.y()).of_size(bbox.width(), bbox.height());
-                draw_hollow_rect_mut(&mut rgba, rect, Rgba([255, 0, 0, 255]));
+                // let rect = Rect::at(bbox.x(), bbox.y()).of_size(bbox.width(), bbox.height());
+                // draw_hollow_rect_mut(&mut rgba, rect, Rgba([255, 0, 0, 255]));
                 let resized = mustache.resize(5 * bbox.width() / 10, 7 * bbox.height() / 10, FilterType::Nearest);
                 let mustache_again = resized.to_rgba();
                 // let resized: image::ImageBuffer<Rgb<u8>, Vec<u8>> =  ImageBuffer::from_pixel( 4 * bbox.width() / 10, bbox.height() / 10, Rgb([100,100,100]));
